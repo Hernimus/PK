@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 
 
-from pgmpy.models import DiscreteBayesianNetwork
+from pgmpy.models import BayesianNetwork
 from pgmpy.estimators import HillClimbSearch, BayesianEstimator
 from pgmpy.inference import VariableElimination
 from pgmpy.estimators import MaximumLikelihoodEstimator
@@ -83,7 +83,7 @@ if selected == "Bayesian Network":
         st.write(f"Distribusi {col}:\n", data[col].value_counts())
 
     # --- Struktur Bayesian Network ---
-    model_bn = DiscreteBayesianNetwork([
+    model_bn = BayesianNetwork([
         ('ParentalSupport', 'GPA'),
         ('ParentalEducation', 'GPA'),
         ('StudyTimeWeekly', 'GPA'),
