@@ -43,4 +43,4 @@ with open(pdf_path, "rb") as f:
 
 # Menampilkan PDF dalam iframe
 pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="800" height="500" type="application/pdf"></iframe>'
-st.markdown(pdf_display, unsafe_allow_html=True
+st.markdown(pdf_display, unsafe_allow_html=True)
