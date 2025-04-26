@@ -33,9 +33,9 @@ if selected == "TEAMS":
 
 if selected == "ABOUT PROJECT":
    st.title("Project Probabilistic Reasoning (Penalaran Probabilistik): Prediksi Performa Mahasiswa Berbasis Bayesian Network")
-    pdf_path = "./data/Project 3.pdf"
-    with open(pdf_path, "rb") as f:
+   pdf_path = "./data/Project 3.pdf"
+   with open(pdf_path, "rb") as f:
         base64_pdf = base64.b64encode(f.read()).decode('utf-8')
-    pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="800" height="500" type="application/pdf"></iframe>'
-    st.markdown(pdf_display, unsafe_allow_html=True)
+   pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="800" height="500" type="application/pdf"></iframe>'
+   st.markdown(pdf_display, unsafe_allow_html=True)
 
