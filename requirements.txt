@@ -3,5 +3,7 @@ streamlit
 matplotlib
 pandas
 scikit-learn
+seaborn
+pgmpy==0.1.21
 numpy
 streamlit-option-menu
