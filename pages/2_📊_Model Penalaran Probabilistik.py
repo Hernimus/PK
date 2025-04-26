@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 
 
-from pgmpy.models import BayesianNetwork
+from pgmpy.models import DiscreteBayesianNetwork
 from pgmpy.estimators import HillClimbSearch, BayesianEstimator
 from pgmpy.inference import VariableElimination
 from pgmpy.estimators import MaximumLikelihoodEstimator
@@ -24,7 +24,13 @@ with st.sidebar:
 
 if selected == "Bayesian Network":
 
-    
+    # Mengakses data yang telah diproses dari session_state
+    if 'data_processed' in st.session_state:
+        data_processed = st.session_state.data_processed
+        st.write("Data Precossed:", data_processed)
+    else:
+        st.write("Data belum diproses.")
+
     # --- Gunakan data_processed yang sudah strip kolomnya ---
     data = data_processed.copy()
     # --- Normalisasi numerik ---
@@ -77,7 +83,7 @@ if selected == "Bayesian Network":
         st.write(f"Distribusi {col}:\n", data[col].value_counts())
 
     # --- Struktur Bayesian Network ---
-    model_bn = BayesianNetwork([
+    model_bn = DiscreteBayesianNetwork([
         ('ParentalSupport', 'GPA'),
         ('ParentalEducation', 'GPA'),
         ('StudyTimeWeekly', 'GPA'),
@@ -100,8 +106,11 @@ if selected == "Bayesian Network":
 
     # Ambil 1 sample dari data untuk dijadikan evidence
     sample = data[['ParentalSupport', 'StudyTimeWeekly', 'Tutoring']].sample(1).iloc[0]
+    # Konversi semua np.int64 jadi int biasa
+    evidence = {col: int(val) for col, val in sample.items()}
     st.subheader("Evidence digunakan")
-    st.write(dict(sample))
+    st.write(evidence)
+
 
     # Prediksi GPA
     q1 = infer_bn.map_query(
