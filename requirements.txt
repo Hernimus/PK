@@ -4,6 +4,6 @@ matplotlib
 pandas
 scikit-learn
 seaborn
-pgmpy==0.1.21
+pgmpy
 numpy
 streamlit-option-menu
