@@ -166,6 +166,10 @@ if selected == "PREPROCESSING":
 
     st.write(data_processed)
 
+    # Simpan data yang sudah diproses ke session_state
+    st.session_state.data_processed = data_processed
+    st.write("Data diproses dan disimpan dalam session_state.")
+
     st.header("Normalisasi atau diskretisasi variabel")
     data_processed.columns = data_processed.columns.str.strip()
 
