@@ -5,6 +5,6 @@ pandas
 scikit-learn
 seaborn
 pygraphviz
-pgmpy==0.1.21
-numpy==1.23.5
+pgmpy
+numpy
 streamlit-option-menu
