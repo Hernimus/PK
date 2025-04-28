@@ -1,17 +1,49 @@
-import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
+import networkx as nx
+import numpy as np
+import pickle
 
-
-
-from streamlit_option_menu import option_menu
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import RobustScaler
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import LabelEncoder
+
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.metrics import accuracy_score
+
+from pgmpy.estimators import HillClimbSearch, BicScore
+from pgmpy.models import BayesianNetwork
+
+from sklearn.preprocessing import KBinsDiscretizer
+from sklearn.model_selection import train_test_split
+
+from pgmpy.estimators import BayesianEstimator
+from pgmpy.inference import VariableElimination
+
+from pgmpy.estimators import HillClimbSearch, K2Score, BayesianEstimator
+from pgmpy.estimators import MaximumLikelihoodEstimator
+
+from sklearn.naive_bayes import GaussianNB
+from sklearn.naive_bayes import CategoricalNB
+from sklearn.metrics import classification_report
+
+from sklearn.metrics import mean_absolute_error, mean_squared_error, accuracy_score, precision_score, recall_score, roc_auc_score
+from sklearn.model_selection import KFold
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.calibration import calibration_curve
+from sklearn.preprocessing import label_binarize
+
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
+import streamlit as st
+from streamlit_option_menu import option_menu
 
 st.set_page_config(
-    page_title="HOME",
+    page_title="Dataset and Variable",
     page_icon="🗃",
     layout="wide"
 )
@@ -19,15 +51,24 @@ st.set_page_config(
 data = pd.read_csv("./data/Student_performance_data_.csv")
 
 with st.sidebar:
-    selected = option_menu(
-        menu_title="DATASET",
-        options=["DATASET", "PREPROCESSING"],
-    )
+    # Cek apakah perlu otomatis memilih menu preprocessing
+    if 'auto_select_preprocessing' in st.session_state and st.session_state.auto_select_preprocessing:
+        # Set default index ke 1 (PREPROCESSING) agar terpilih otomatis
+        selected = option_menu(
+            menu_title="DATASET",
+            options=["DATASET", "PREPROCESSING"],
+            default_index=1  # Index 1 untuk PREPROCESSING
+        )
+        # Hapus flag setelah digunakan agar tidak mempengaruhi render berikutnya
+        del st.session_state['auto_select_preprocessing']
+    else:
+        # Perilaku normal (default memilih DATASET)
+        selected = option_menu(
+            menu_title="DATASET",
+            options=["DATASET", "PREPROCESSING"],
+        )
 
 if selected == "DATASET":
-
-
-    
     st.title("DATASET")
 
     st.header("📋 Preview Data")
@@ -40,6 +81,7 @@ if selected == "DATASET":
     st.write(f"Total memory used: {mem_in_kb:.2f} KB ({mem_in_mb:.2f} MB)")
 
     st.markdown("---")
+    st.subheader("Tipe Data")
     st.dataframe(data.dtypes.to_frame(name='Data Type'))
 
     st.markdown("---")
@@ -118,190 +160,200 @@ if selected == "DATASET":
         - `4`: F (GPA < 2.0)  
     """)
 
-
 if selected == "PREPROCESSING":
-    st.write("# ⚙ PREPROCESSING DATASET")
+    with st.sidebar:
+        sub_selected = option_menu(
+            menu_title="",
+            options=["Analisis Statistik Deskriptif", "Penanganan Missing Value", "Normalisasi atau diskretisasi variabel", "Analisis Korelasi", "Visualisasi distribusi data untuk memahami pola"],
+        )
+    if sub_selected == "Analisis Statistik Deskriptif":
+        st.header("Analisis Statistik Deskriptif")
+        st.header("📋 Dataset Describe")
+        st.dataframe(data.describe())
+        st.write("### Gender Distribution")
+        st.table(data["Gender"].value_counts().to_frame())
+        st.write("### Ethnicity Distribution")
+        st.write(data["Ethnicity"].value_counts().to_frame())
+        st.write("### Parental Education Distribution")
+        st.table(data["ParentalEducation"].value_counts().to_frame())
+        st.write("### Parental Support Distribution")
+        st.table(data["ParentalSupport"].value_counts().to_frame())
+        st.write("### Extracurricular Activities Distribution")
+        st.table(data["Extracurricular"].value_counts().to_frame())
+        st.write("### Sports Participation Distribution")
+        st.table(data["Sports"].value_counts().to_frame())
+        st.write("### Music Participation Distribution")
+        st.table(data["Music"].value_counts().to_frame())
+        st.write("### Volunteering Distribution")
+        st.table(data["Volunteering"].value_counts().to_frame())
+        st.write("### Grade Class Distribution")
+        st.table(data["GradeClass"].value_counts().to_frame())
 
-    st.header("Analisis Statistik Deskriptif")
-    # Menampilkan 5 baris pertama menggunakan Streamlit
-    st.subheader("5 Baris Pertama DataFrame:")
-    st.dataframe(data.head())  # Menampilkan 5 baris pertama
-    st.subheader("Statistik deskriptif")
-    st.dataframe(data.describe())
-    st.markdown("---")
-
-    st.header("Penanganan Missing Value")
-    st.dataframe(data.isnull().sum().to_frame(name='Missing Values'))
-    st.write("Jumlah missing value pada dataset: ", data.isnull().sum().sum())
-    st.write("Hasil pengecekan missing value menunjukkan bahwa tidak ada nilai yang hilang di seluruh kolom, sehingga data dalam kondisi lengkap.")
-    st.markdown("---")
-
-  
-    st.header("Mapping Label Kategorikal agar lebih informatif")
-    # Salin data untuk transformasi (mapping + normalisasi)
-    data_processed = data.copy()
-
-    gender_map = {0: "Male", 1: "Female"}
-    ethnicity_map = {0: "Caucasian", 1: "African American", 2: "Asian", 3: "Other"}
-    parental_education_map = {0: "None", 1: "High School", 2: "Some College", 3: "Bachelor's", 4: "Higher"}
-    parental_support_map = {0: "None", 1: "Low", 2: "Moderate", 3: "High", 4: "Very High"}
-    extracurricular_map = {0: "No", 1: "Yes"}
-    sports_map = {0: "No", 1: "Yes"}
-    music_map = {0: "No", 1: "Yes"}
-    volunteering_map = {0: "No", 1: "Yes"}
-    gradeclass_map = {0: 'A', 1: 'B', 2: 'C', 3: 'D', 4: 'F'}
-    tutoring_map = {0: 'No', 1: 'Yes'}
-
-    # Terapkan mapping
-    data_processed['Gender'] = data_processed['Gender'].map(gender_map)
-    data_processed['Ethnicity'] = data_processed['Ethnicity'].map(ethnicity_map)
-    data_processed['ParentalEducation'] = data_processed['ParentalEducation'].map(parental_education_map)
-    data_processed['ParentalSupport'] = data_processed['ParentalSupport'].map(parental_support_map)
-    data_processed['Extracurricular'] = data_processed['Extracurricular'].map(extracurricular_map)
-    data_processed['Sports'] = data_processed['Sports'].map(sports_map)
-    data_processed['Music'] = data_processed['Music'].map(music_map)
-    data_processed['Volunteering'] = data_processed['Volunteering'].map(volunteering_map)
-    data_processed['GradeClass'] = data_processed['GradeClass'].map(gradeclass_map)
-    data_processed['Tutoring'] = data_processed['Tutoring'].map(tutoring_map)
-
-    st.write(data_processed)
-
-    # Simpan data yang sudah diproses ke session_state
-    st.session_state.data_processed = data_processed
-    st.write("Data diproses dan disimpan dalam session_state.")
-
-    st.header("Normalisasi atau diskretisasi variabel")
-    data_processed.columns = data_processed.columns.str.strip()
-
-    # Daftar kolom numerik yang akan dinormalisasi
-    features_to_scale = ['Age', 'StudyTimeWeekly', 'Absences', 'GPA']
-
-    # Hapus titik dan ubah ke angka
-    for col in features_to_scale:
-        data_processed[col] = data_processed[col].astype(str).str.replace('.', '', regex=False)
-        data_processed[col] = pd.to_numeric(data_processed[col], errors='coerce')
-
-    # Daftar kolom numerik yang akan dinormalisasi
-    features_to_scale = ['Age', 'StudyTimeWeekly', 'Absences', 'GPA']
-
-    # Inisialisasi scaler dan salin data untuk versi ternormalisasi
-    data_scaled = data_processed.copy()
-    scaler = MinMaxScaler()
-
-    # Menerapkan normalisasi hanya pada fitur numerik
-    data_scaled[features_to_scale] = scaler.fit_transform(data_scaled[features_to_scale])
-
-    st.write(data_scaled.head())
-    st.markdown("---")
-
-
-
-    st.header("Analisis korelasi")
-    # Salin dataframe
-    data_encoded = data_scaled.copy()
-
-    # Ubah kolom kategorikal menjadi numerik
-    for col in data_encoded.select_dtypes(include='object').columns:
-        data_encoded[col] = LabelEncoder().fit_transform(data_encoded[col])
-
-    # Hitung korelasi untuk semua kolom (tanpa StudentID) dengan metode Pearson
-    correlation_matrix_all = data_encoded.drop(columns=['StudentID']).corr(method='pearson')
-
-    # Menampilkan DataFrame korelasi
-    st.subheader("Matriks Korelasi Variable:")
-    st.write(correlation_matrix_all)
-
-    # Visualisasi korelasi dengan heatmap
-    plt.figure(figsize=(14, 10))
-    sns.heatmap(correlation_matrix_all, annot=True, cmap='coolwarm', fmt=".2f")
-    plt.title("Matriks Korelasi Seluruh Variabel (Termasuk Kategorikal)")
-
-    # Menampilkan heatmap ke dalam Streamlit
-    st.pyplot(plt)
-
-    # Korelasi antar variabel numerik
-    correlation_matrix = data_scaled.drop(columns=['StudentID']).select_dtypes(include=['float64']).corr(method='pearson')
-
-    # Menampilkan DataFrame korelasi
-    st.subheader("Matriks Korelasi Antar Variabel Numerik:")
-    st.write(correlation_matrix)
-
-    # Visualisasi matriks korelasi dengan heatmap
-    plt.figure(figsize=(8, 4))
-    sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f")
-    plt.title("Matriks Korelasi antar Variabel Numerik")
-
-    # Menampilkan heatmap ke dalam Streamlit
-    st.pyplot(plt)
-    st.markdown("---")
-
-    st.header("Visualisasi distribusi data")
-    # Scatter plot interaktif untuk dua variabel numerik
-    fig1 = px.scatter(data_scaled, x='Age', y='GPA', color='GradeClass',
-                    title="Hubungan antara Age dan GPA",
-                    labels={'Age': 'Usia', 'GPA': 'Nilai GPA'},
-                    color_continuous_scale='Viridis')
-
-    # Pairplot interaktif antara beberapa variabel
-    fig2 = px.scatter_matrix(data_scaled, dimensions=['Age', 'StudyTimeWeekly', 'Absences', 'GPA'],
-                            color='GradeClass', title="Matrix Hubungan Antar Variabel",
-                            labels={'Age': 'Usia', 'StudyTimeWeekly': 'Waktu Belajar', 'Absences': 'Absensi', 'GPA': 'Nilai GPA'})
-
-
-    # Menampilkan scatter plot
-    st.plotly_chart(fig1)
-
-    # Menampilkan pairplot
-    st.plotly_chart(fig2)
-
-    st.subheader("Visualisasi distribusi data untuk variabel numerik dan kategorikal")
-
-    # Hitung jumlah kolom yang akan diplot
-    num_columns = len(data_scaled.columns)
-
-    # Loop melalui data dengan step 5 (untuk 5 plot per baris)
-    for i in range(0, num_columns, 3):
-        # Ambil 5 kolom sekaligus
-        cols_to_plot = data_scaled.columns[i:i+3]
-        num_plots = len(cols_to_plot)
+    if sub_selected == "Penanganan Missing Value":     
+        st.dataframe(data.isnull().sum().to_frame(name='Missing Values'))
+        st.write("Jumlah missing value pada dataset: ", data.isnull().sum().sum())
+        st.write("Hasil pengecekan missing value menunjukkan bahwa tidak ada nilai yang hilang di seluruh kolom, sehingga data dalam kondisi lengkap.")
         
-        # Buat figure dengan subplots 1 baris x 5 kolom
-        fig, axes = plt.subplots(1, num_plots, figsize=(10, 4))
+    if sub_selected == "Normalisasi atau diskretisasi variabel": 
+        # copy data_mapped
+        data_normalization = data.copy()
+        st.session_state.data_normalization = data_normalization
+
+        # hilangkan whitespace
+        data_normalization.columns = data_normalization.columns.str.strip()
+
+        # Tangani GPA dan diskretisasi langsung
+        data_normalization['GPA'] = data_normalization['GPA'].apply(lambda x: 1.9 if x < 2.0 else x)
+
+        # Bins dan labels untuk diskretisasi GPA dan StudyTimeWeekly
+        gpa_bins = [0, 2.0, 2.5, 3.0, 3.5, float('inf')]  # Bins harus monoton meningkat
+        gpa_labels = [4, 3, 2, 1, 0]  # Label untuk setiap bin GPA
+
+        study_bins = [0, 5, 10, 15, float('inf')]  # Bins untuk StudyTimeWeekly
+        study_labels = [0, 1, 2, 3]  # Label untuk setiap bin StudyTimeWeekly
+
+        # Terapkan pd.cut untuk diskretisasi
+        data_normalization['GPA_Disc'] = pd.cut(data_normalization['GPA'], bins=gpa_bins, labels=gpa_labels, right=False)
+        data_normalization['StudyTimeWeekly_Disc'] = pd.cut(data_normalization['StudyTimeWeekly'], bins=study_bins, labels=study_labels, right=False)
+
+        # Drop kolom asli yang sudah didiskritkan
+        data_normalization = data_normalization.drop(["GPA", "StudyTimeWeekly"], axis=1)
+
+        # Pisahkan fitur numerik yang perlu didiskritkan
+        numerical_features_to_discretize = [col for col in data_normalization.columns if col not in ['GPA_Disc', 'StudyTimeWeekly_Disc']]
+
+        # Diskretisasi sisa fitur yang belum diskrit (gunakan KBinsDiscretizer untuk fitur lainnya)
+        discretizer = KBinsDiscretizer(n_bins=5, encode='ordinal', strategy='uniform')
+        data_normalization[numerical_features_to_discretize] = discretizer.fit_transform(data_normalization[numerical_features_to_discretize])
+
+        # Ubah ke int
+        data_normalization[numerical_features_to_discretize] = data_normalization[numerical_features_to_discretize].astype(int)
+
+        # Drop NaN jika ada
+        data_normalization = data_normalization.dropna().reset_index(drop=True)
+
+        # Tampilkan hasil diskretisasi
+        st.table(data_normalization[['GPA_Disc', 'StudyTimeWeekly_Disc']].head())
+
+        st.table(data_normalization[['Age', 'Absences', 'GPA_Disc', 'StudyTimeWeekly_Disc']].head(5))
+    
+        st.dataframe(data_normalization[['Age', 'Absences', 'GPA_Disc' , 'StudyTimeWeekly_Disc']].nunique())
+
+
+    if sub_selected == "Analisis Korelasi": 
+        # Salin dataframe
+        data_encoded = st.session_state.data_normalization.copy()
+
+        # Ubah kolom kategorikal menjadi numerik
+        for col in data_encoded.select_dtypes(include='object').columns:
+            data_encoded[col] = LabelEncoder().fit_transform(data_encoded[col])
+
+        # Hitung korelasi untuk semua kolom (tanpa StudentID) dengan metode Pearson
+        correlation_matrix_all = data_encoded.drop(columns=['StudentID']).corr(method='pearson')
+
+        # Visualisasi korelasi dengan heatmap
+        plt.figure(figsize=(14, 10))
+        sns.heatmap(correlation_matrix_all, annot=True, cmap='coolwarm', fmt=".2f")
+        plt.title("Matriks Korelasi Seluruh Variabel (Termasuk Kategorikal)")
+        st.pyplot(plt)
+
+
+    if sub_selected == "Visualisasi distribusi data untuk memahami pola": 
+         
+        # Scatter plot interaktif untuk dua variabel diskrit
+        fig = px.scatter(st.session_state.data_normalization  , x='Age', y='GPA_Disc', color='GradeClass',
+                        title="Hubungan antara Age dan GPA Diskrit",
+                        labels={'Age': 'Usia', 'GPA_Disc': 'Nilai GPA Diskrit'},
+                        color_continuous_scale='Viridis')
+        st.plotly_chart(fig)
+
         
-        # Jika hanya 1 plot, axes bukan array jadi kita konversi ke list
-        if num_plots == 1:
-            axes = [axes]
-        
-        for j, col in enumerate(cols_to_plot):
-            ax = axes[j]
+        # Pairplot interaktif antara beberapa variabel diskrit
+        fig = px.scatter_matrix(st.session_state.data_normalization  , dimensions=['Age', 'StudyTimeWeekly_Disc', 'Absences', 'GPA_Disc'],
+                                color='GradeClass', title="Matrix Hubungan Antar Variabel Diskrit",
+                                labels={'Age': 'Usia', 'StudyTimeWeekly_Disc': 'Waktu Belajar Diskrit', 'Absences': 'Absensi', 'GPA_Disc': 'Nilai GPA Diskrit'})
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Fitur numerik (kontinu atau telah dinormalisasi)
+        numerical_features = ['Age', 'StudyTimeWeekly_Disc', 'Absences', 'GPA_Disc', 'Gender', 'Ethnicity', 'ParentalEducation', 'ParentalSupport',
+                                'Extracurricular', 'Sports', 'Music', 'Volunteering', 'GradeClass', 'Tutoring']
+
+        # Visualisasi distribusi untuk fitur numerik (histogram dan boxplot)
+        for feature in numerical_features:
+            plt.figure(figsize=(12, 5))
+
+            plt.subplot(1, 2, 1)
+            sns.histplot(st.session_state.data_normalization[feature], kde=True)
+            plt.title(f'Distribusi {feature}')
+            plt.xlabel(feature)
+            plt.ylabel('Frekuensi/Kepadatan')
+
+            plt.subplot(1, 2, 2)
+            sns.boxplot(y=st.session_state.data_normalization[feature])
+            plt.title(f'Box Plot {feature}')
+            plt.ylabel(feature)
+
+            plt.tight_layout()
+            st.pyplot(plt)
             
-            # Cek apakah variabel kategorikal atau numerik
-            if data_scaled[col].nunique() <= 10 and data_scaled[col].dtype == 'object':
-                # Variabel kategorikal
-                sns.countplot(x=data_scaled[col], palette='Set2', ax=ax)
-                ax.set_title(f"Distribusi {col}")
-                ax.tick_params(axis='x', rotation=45)
-                
-                # Menambahkan nilai pada masing-masing bar
-                for p in ax.patches:
-                    height = p.get_height()
-                    if height > 0:
-                        ax.text(p.get_x() + p.get_width() / 2., height + 0.1, 
-                            f'{int(height)}', ha="center", fontsize=9)
-            
-            elif data_scaled[col].dtype in ['float64', 'int64']:
-                # Variabel numerik
-                sns.histplot(data_scaled[col], kde=True, color='skyblue', bins=20, ax=ax)
-                ax.set_title(f"Distribusi {col}")
-                
-                # Menambahkan nilai pada histogram
-                for p in ax.patches:
-                    height = p.get_height()
-                    if height > 0:
-                        ax.text(p.get_x() + p.get_width() / 2., height + 0.1, 
-                            f'{int(height)}', ha='center', fontsize=5)
-        
-        plt.tight_layout()
-        st.pyplot(fig)
-        plt.close(fig)  # Tutup figure untuk menghemat memori
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
         
